@@ -325,6 +325,6 @@ def test_oasst_conversation_chain_handler_is_fast(tmp_path):
 
     t_0 = time.time()
     conversation_chain_handler = ConversationChainHandler(df, cfg)
-    _ = [conversation for conversation in conversation_chain_handler]
+    _ = list(conversation_chain_handler)
     t_1 = time.time()
     assert t_1 - t_0 < 10  # shouldn't take longer than ~5 seconds

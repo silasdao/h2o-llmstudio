@@ -58,7 +58,7 @@ if __name__ == "__main__":
         process_queue = [int(x) for x in parser_args.process_queue.split(",")]
 
     while True:
-        if len(process_queue) == 0:
+        if not process_queue:
             break
         done, num = check_for_done(process_queue)
         if done:

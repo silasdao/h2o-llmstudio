@@ -17,9 +17,14 @@ from llm_studio.src.datasets.text_causal_language_modeling_ds import CustomDatas
 def test_prepare_default_dataset(tmp_path):
     df = prepare_default_dataset(tmp_path)
     assert isinstance(df, pd.DataFrame)
-    assert set(df.keys()) == set(
-        ["instruction", "output", "id", "parent_id", "lang", "rank"]
-    )
+    assert set(df.keys()) == {
+        "instruction",
+        "output",
+        "id",
+        "parent_id",
+        "lang",
+        "rank",
+    }
     assert df.shape == (8274, 6)
 
 

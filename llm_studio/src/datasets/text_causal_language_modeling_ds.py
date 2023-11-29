@@ -120,7 +120,7 @@ class CustomDataset(Dataset):
         # make sure system encoding is always prepended if max_length exceeded
         if sample["input_ids"][0] != self.tokenizer.pad_token_id:
             sample["input_ids"][: len(system_encoding)] = system_encoding
-            if self.cfg.dataset.mask_prompt_labels and "labels" in sample.keys():
+            if self.cfg.dataset.mask_prompt_labels and "labels" in sample:
                 sample["labels"][: len(system_encoding)] = -100
         if sample["prompt_input_ids"][0] != self.tokenizer.pad_token_id:
             sample["prompt_input_ids"][: len(system_encoding)] = system_encoding
@@ -146,7 +146,7 @@ class CustomDataset(Dataset):
     @staticmethod
     def parse_system(cfg: Any, system: str):
         # no system tokens if empty
-        if system == "":
+        if not system:
             return system
         system = (
             f"{codecs.decode(cfg.dataset.text_system_start, 'unicode_escape')}{system}"
@@ -276,18 +276,17 @@ class CustomDataset(Dataset):
 
     def postprocess_output(self, cfg, df: pd.DataFrame, output: Dict) -> Dict:
         if cfg.problem_type == "text_causal_classification_modeling":
+            preds = output["logits"]
             if cfg.dataset.num_classes == 1:
-                preds = output["logits"]
                 preds = np.array((preds > 0.0)).astype(int).astype(str).reshape(-1)
             else:
-                preds = output["logits"]
                 preds = (
                     np.array(torch.argmax(preds, dim=1))  # type: ignore[arg-type]
                     .astype(str)
                     .reshape(-1)
                 )
             output["predicted_text"] = preds
-        elif not cfg.prediction.metric == "Perplexity":
+        elif cfg.prediction.metric != "Perplexity":
             output = self.clean_output(output, cfg)
 
         output["target_text"] = self.conversation_chain_handler.answers
@@ -327,10 +326,10 @@ class CustomDataset(Dataset):
             self.conversation_chain_handler.get_conversation_end_ids()
         )
 
-        if "predicted_text" in output.keys():
+        if "predicted_text" in output:
             output["predicted_text"] = np.array(output["predicted_text"])
 
-        if "logits" in output.keys():
+        if "logits" in output:
             output["logits"] = np.array(output["logits"].float())
 
         if isinstance(cfg.dataset.prompt_column, tuple):
@@ -341,7 +340,7 @@ class CustomDataset(Dataset):
                 end_conversation_ids, cfg.dataset.prompt_column
             ].values
 
-        if "predicted_text" in output.keys():
+        if "predicted_text" in output:
             df[f"pred_{cfg.dataset.answer_column}"] = (
                 "NO ANSWER GENERATED. "
                 "ONLY LAST ANSWER OF A CONVERSATION IS PREDICTED."
@@ -428,12 +427,10 @@ class CustomDataset(Dataset):
         """
         encodings = [
             self._get_sample_encoding(system, prompt, answer)
-            for idx, (system, prompt, answer) in enumerate(
-                zip(
-                    input_text_dict["systems"],
-                    input_text_dict["prompts"],
-                    input_text_dict["answers"],
-                )
+            for system, prompt, answer in zip(
+                input_text_dict["systems"],
+                input_text_dict["prompts"],
+                input_text_dict["answers"],
             )
         ]
 
@@ -456,7 +453,7 @@ class CustomDataset(Dataset):
         # randomly skip parent
         parent_encodings = [
             encoding
-            for idx, encoding in enumerate(parent_encodings)
+            for encoding in parent_encodings
             if np.random.random() > self.cfg.augmentation.skip_parent_probability
         ]
         # randomly replace parent with another parent
@@ -477,7 +474,7 @@ class CustomDataset(Dataset):
         return encodings
 
     def _get_sample_encoding(self, system: str, prompt: str, answer: str) -> List:
-        if len(system) > 0:
+        if system != "":
             system_encoding = self.encode(
                 self.tokenizer, system, self.cfg.tokenizer.max_length_prompt, "right"
             )["input_ids"]

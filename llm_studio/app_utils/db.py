@@ -66,7 +66,7 @@ class Database:
             id: dataset id to delete
         """
 
-        dataset = self._session.query(Dataset).get(int(id))
+        dataset = self._session.query(Dataset).get(id)
         self._session.delete(dataset)
         self._session.commit()
 
@@ -80,7 +80,7 @@ class Database:
             Dataset with given id
         """
 
-        return self._session.query(Dataset).get(int(id))
+        return self._session.query(Dataset).get(id)
 
     def get_datasets_df(self) -> DataFrame:
         """Return dataframe containing all datasets
@@ -109,7 +109,7 @@ class Database:
             id: experiment id to delete
         """
 
-        experiment = self._session.query(Experiment).get(int(id))
+        experiment = self._session.query(Experiment).get(id)
         self._session.delete(experiment)
         self._session.commit()
 
@@ -123,7 +123,7 @@ class Database:
             Experiment with given id
         """
 
-        return self._session.query(Experiment).get(int(id))
+        return self._session.query(Experiment).get(id)
 
     def get_experiments_df(self) -> DataFrame:
         """Return dataframe containing all experiments

@@ -320,6 +320,4 @@ def card_wait(msg: str, box: str) -> ui.FormCard:
 
     """
 
-    card = ui.form_card(box=box, items=[ui.progress(label=msg)])
-
-    return card
+    return ui.form_card(box=box, items=[ui.progress(label=msg)])

@@ -44,20 +44,17 @@ class WaveTheme:
         return "WaveTheme"
 
     def get_value_by_key(self, q: Q, key: str):
-        value = (
+        return (
             self._theme_colors["dark"][key]
             if q.client.theme_dark
             else self._theme_colors["light"][key]
         )
-        return value
 
     def get_primary_color(self, q: Q):
-        primary_color = self.get_value_by_key(q, "primary")
-        return primary_color
+        return self.get_value_by_key(q, "primary")
 
     def get_background_color(self, q: Q):
-        background_color = self.get_value_by_key(q, "background_color")
-        return background_color
+        return self.get_value_by_key(q, "background_color")
 
 
 wave_theme = WaveTheme()
@@ -104,15 +101,16 @@ def ui_table_from_df(
     min_widths = min_widths or {}
     max_widths = max_widths or {}
 
-    cell_types = {}
-    for col in tags:
-        cell_types[col] = ui.tag_table_cell_type(
+    cell_types = {
+        col: ui.tag_table_cell_type(
             name="tags",
             tags=[
                 ui.tag(label=state, color=wave_theme.states[state])
                 for state in wave_theme.states
             ],
         )
+        for col in tags
+    }
     for col in progresses:
         cell_types[col] = ui.progress_table_cell_type(
             wave_theme.get_primary_color(q),
@@ -125,16 +123,16 @@ def ui_table_from_df(
         ui.table_column(
             name=str(col),
             label=str(col),
-            sortable=True if col in sortables else False,
-            filterable=True if col in filterables else False,
-            searchable=True if col in searchables else False,
+            sortable=col in sortables,
+            filterable=col in filterables,
+            searchable=col in searchables,
             data_type="number"
             if col in numerics
             else ("time" if col in times else "string"),
-            cell_type=cell_types[col] if col in cell_types else None,
+            cell_type=cell_types.get(col, None),
             min_width=min_widths[col] if col in min_widths else None,
             max_width=max_widths[col] if col in max_widths else None,
-            link=True if col == link_col else False,
+            link=col == link_col,
             cell_overflow=cell_overflow,
         )
         for col in df.columns.values
@@ -258,7 +256,7 @@ def wave_utils_error_card(
     if not q.app.wave_utils_stack_trace_str:
         q.app.wave_utils_stack_trace_str = "### stacktrace\n" + "\n".join(stack_trace)
 
-    card = ui.form_card(
+    return ui.form_card(
         box=box,
         items=[
             ui.stats(
@@ -274,11 +272,15 @@ def wave_utils_error_card(
                 justify="center",
             ),
             ui.separator(),
-            ui.text_l(content="<center>Apologies for the inconvenience!</center>"),
+            ui.text_l(
+                content="<center>Apologies for the inconvenience!</center>"
+            ),
             ui.buttons(
                 items=[
                     ui.button(name="home", label="Restart", primary=True),
-                    ui.button(name="report_error", label="Report", primary=True),
+                    ui.button(
+                        name="report_error", label="Report", primary=True
+                    ),
                 ],
                 justify="center",
             ),
@@ -296,13 +298,15 @@ def wave_utils_error_card(
             ui.text_xs(content=q_client_str, visible=False),
             ui.text_xs(content=q_events_str, visible=False),
             ui.text_xs(content=q_args_str, visible=False),
-            ui.text_xs(content=q.app.wave_utils_stack_trace_str, visible=False),
+            ui.text_xs(
+                content=q.app.wave_utils_stack_trace_str, visible=False
+            ),
             ui.text_xs(content=f"### Error\n {error}", visible=False),
-            ui.text_xs(content=f"### Git Version\n {git_version}", visible=False),
+            ui.text_xs(
+                content=f"### Git Version\n {git_version}", visible=False
+            ),
         ],
     )
-
-    return card
 
 
 async def wave_utils_handle_error(q: Q, error: Exception):

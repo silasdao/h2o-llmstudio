@@ -109,9 +109,9 @@ async def handle(q: Q) -> None:
         elif q.args["dataset/delete/dialog/single"]:
             dataset_id = int(q.args["dataset/delete/dialog/single"])
             q.client["dataset/delete/single/id"] = dataset_id
-            name = q.client["dataset/list/df_datasets"]["name"].iloc[dataset_id]
-
             if q.client["delete_dialogs"]:
+                name = q.client["dataset/list/df_datasets"]["name"].iloc[dataset_id]
+
                 await delete_dialog(q, [name], "dataset/delete/single", "dataset")
             else:
                 dataset_id = q.client["dataset/list/df_datasets"]["id"].iloc[dataset_id]
@@ -337,7 +337,7 @@ async def handle(q: Q) -> None:
             await dataset_import(q, step=4, edit=True)
         elif q.args["dataset/import/6"]:
             await dataset_import(q, step=6)
-        elif q.args["dataset/import/source"] and not q.args["dataset/list"]:
+        elif q.args["dataset/import/source"]:
             await dataset_import(q, step=1)
         elif q.args["dataset/merge"]:
             await dataset_merge(q, step=1)

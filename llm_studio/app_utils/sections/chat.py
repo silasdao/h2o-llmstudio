@@ -164,12 +164,10 @@ def gpu_is_blocked(q, gpu_id):
     experiments = get_experiments(q=q)
     running_experiments = experiments[experiments.status.isin(["running"])]
     gpu_blocked = any(
-        [
-            str(gpu_id) in gpu_list
-            for gpu_list in running_experiments["gpu_list"]
-            .apply(lambda x: x.split(","))
-            .to_list()
-        ]
+        str(gpu_id) in gpu_list
+        for gpu_list in running_experiments["gpu_list"]
+        .apply(lambda x: x.split(","))
+        .to_list()
     )
     if gpu_blocked:
         q.page["experiment/display/chat"] = ui.form_card(

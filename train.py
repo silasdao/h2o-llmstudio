@@ -177,10 +177,7 @@ def run_train(
         Last train batch
     """
 
-    scaler: GradScaler | None = None
-    if cfg.environment.mixed_precision:
-        scaler = GradScaler()
-
+    scaler = GradScaler() if cfg.environment.mixed_precision else None
     optimizer.zero_grad(set_to_none=True)
 
     # Prepare NLP Augmentation
@@ -364,8 +361,8 @@ def run_train(
                     cfg=cfg, model=model, val_dataloader=val_dataloader, val_df=val_df
                 )
 
-                if cfg.training.save_best_checkpoint:
-                    if objective_op(val_metric, best_val_metric):
+                if objective_op(val_metric, best_val_metric):
+                    if cfg.training.save_best_checkpoint:
                         checkpoint_path = cfg.output_directory
                         if cfg.environment._local_rank == 0:
                             logger.info(

@@ -15,10 +15,7 @@ class Order:
     """
 
     def __init__(self, keys: Optional[List[str]] = None):
-        if keys is not None:
-            self._list = list(keys)
-        else:
-            self._list = list()
+        self._list = list(keys) if keys is not None else []
 
     def _unique_guard(self, *keys: str):
         for key in keys:
@@ -108,7 +105,7 @@ def test_order():
     order.insert("architecture", before="training")
     order.insert("environment", after="validation")
 
-    assert [item for item in order] == [
+    assert list(order) == [
         "dataset",
         "architecture",
         "training",

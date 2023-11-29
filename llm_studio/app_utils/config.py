@@ -13,9 +13,7 @@ def get_size(x):
             return float(x.replace("MB", "")) * (2**20)
         if x.endswith("KB"):
             return float(x.replace("KB", "")) * (2**10)
-        if x.endswith("B"):
-            return float(x.replace("B", ""))
-        return 2**31
+        return float(x.replace("B", "")) if x.endswith("B") else 2**31
     except Exception:
         return 2**31
 

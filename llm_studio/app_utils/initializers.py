@@ -67,7 +67,6 @@ def import_data(q: Q):
     except Exception as e:
         q.client.app_db._session.rollback()
         logger.warning(f"Could not download default dataset: {e}")
-        pass
 
 
 async def initialize_client(q: Q) -> None:
@@ -76,9 +75,7 @@ async def initialize_client(q: Q) -> None:
     logger.info(f"Initializing client {q.client.client_initialized}")
 
     if not q.client.client_initialized:
-        q.client.delete_cards = set()
-        q.client.delete_cards.add("init_app")
-
+        q.client.delete_cards = {"init_app"}
         os.makedirs(get_data_dir(q), exist_ok=True)
         os.makedirs(get_database_dir(q), exist_ok=True)
         os.makedirs(get_output_dir(q), exist_ok=True)

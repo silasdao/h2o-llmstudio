@@ -104,12 +104,11 @@ def save_checkpoint(model: torch.nn.Module, path: str, cfg: Any):
                 checkpoint = {"model": state_dict}
                 torch.save(checkpoint, os.path.join(path, "checkpoint.pth"))
                 shutil.rmtree(os.path.join(path, "ds_checkpoint"))
-    else:
-        if cfg.environment._local_rank == 0:
-            model = unwrap_model(model)
-            checkpoint = {"model": model.state_dict()}
-            if path is not None:
-                torch.save(checkpoint, os.path.join(path, "checkpoint.pth"))
+    elif cfg.environment._local_rank == 0:
+        model = unwrap_model(model)
+        checkpoint = {"model": model.state_dict()}
+        if path is not None:
+            torch.save(checkpoint, os.path.join(path, "checkpoint.pth"))
 
     if (
         cfg.environment._local_rank == 0
@@ -161,17 +160,16 @@ def load_model_weights(
     except Exception as e:
         if strict:
             raise e
-        else:
-            if cfg.environment._local_rank == 0:
-                logger.warning(
-                    "Only a part of the pretrained weights was loaded. "
-                    "Some layers can't be initialized with pretrained "
-                    f"weights: {e}"
-                )
+        if cfg.environment._local_rank == 0:
+            logger.warning(
+                "Only a part of the pretrained weights was loaded. "
+                "Some layers can't be initialized with pretrained "
+                f"weights: {e}"
+            )
 
-            for layer_name in re.findall("size mismatch for (.*?):", str(e)):
-                model_weights.pop(layer_name, None)
-            model.load_state_dict(OrderedDict(model_weights), strict=False)
+        for layer_name in re.findall("size mismatch for (.*?):", str(e)):
+            model_weights.pop(layer_name, None)
+        model.load_state_dict(OrderedDict(model_weights), strict=False)
     return model
 
 
@@ -205,16 +203,15 @@ def load_checkpoint(
 
 
 def get_ds_config(cfg: Any):
-    ds_config = {
+    return {
         "fp16": {
-            "enabled": True if cfg.architecture.backbone_dtype == "float16" else False,
+            "enabled": cfg.architecture.backbone_dtype == "float16",
             "loss_scale_window": 100,
         },
         "bf16": {
-            "enabled": True if cfg.architecture.backbone_dtype == "bfloat16" else False,
+            "enabled": cfg.architecture.backbone_dtype == "bfloat16",
             "loss_scale_window": 100,
         },
-        # https://www.deepspeed.ai/docs/config-json/#zero-optimizations-for-fp16-training
         "zero_force_ds_cpu_optimizer": False,
         "zero_optimization": {
             "stage": 3,
@@ -238,18 +235,6 @@ def get_ds_config(cfg: Any):
         "gradient_accumulation_steps": cfg.training.grad_accumulation,
         "wall_clock_breakdown": False,
     }
-    # TODO: Do not enable offload cpu for now.
-    # if cfg.environment.deepspeed_offload_optimizer:
-    #     ds_config["zero_optimization"]["offload_optimizer"] = {
-    #         "device": "cpu",
-    #         "pin_memory": True,
-    #     }
-    # TODO: RuntimeError: Tensors must be CUDA and dense
-    # if cfg.environment.deepspeed_offload_param:
-    #     ds_config["zero_optimization"]["offload_param"] =
-    #         {"device": "cpu", "pin_memory": True}
-
-    return ds_config
 
 
 def wrap_model_distributed(
@@ -312,8 +297,8 @@ def get_optimizer(model: torch.nn.Module, cfg: Any) -> torch.optim.Optimizer:
                 "params": [
                     param
                     for name, param in model.named_parameters()
-                    if (not any(layer in name for layer in differential_layers))
-                    and (not any(nd in name for nd in no_decay))
+                    if all(layer not in name for layer in differential_layers)
+                    and all(nd not in name for nd in no_decay)
                     and param.requires_grad
                 ],
                 "lr": cfg.training.learning_rate,
@@ -323,7 +308,7 @@ def get_optimizer(model: torch.nn.Module, cfg: Any) -> torch.optim.Optimizer:
                 "params": [
                     param
                     for name, param in model.named_parameters()
-                    if (not any(layer in name for layer in differential_layers))
+                    if all(layer not in name for layer in differential_layers)
                     and (any(nd in name for nd in no_decay))
                     and param.requires_grad
                 ],
@@ -335,7 +320,7 @@ def get_optimizer(model: torch.nn.Module, cfg: Any) -> torch.optim.Optimizer:
                     param
                     for name, param in model.named_parameters()
                     if (any(layer in name for layer in differential_layers))
-                    and (not any(nd in name for nd in no_decay))
+                    and all(nd not in name for nd in no_decay)
                     and param.requires_grad
                 ],
                 "lr": cfg.training.differential_learning_rate,
@@ -374,13 +359,11 @@ def get_scheduler(
         Learning Rate Scheduler
     """
 
-    scheduler = Schedulers.get(cfg.training.schedule)(
+    return Schedulers.get(cfg.training.schedule)(
         optimizer=optimizer,
         num_warmup_steps=cfg.training.warmup_epochs * epoch_steps,
         num_training_steps=cfg.training.epochs * epoch_steps,
     )
-
-    return scheduler
 
 
 def generate_experiment_name() -> str:
@@ -433,12 +416,10 @@ def get_number_of_validation_epochs(training_epochs: int, evaluation_epochs: flo
 def contains_nan(output: Dict):
     return (
         sum(
-            [
-                1
-                for key, val in output.items()
-                if isinstance(val, torch.Tensor)
-                and torch.isnan(val.detach().cpu()).sum() > 0
-            ]
+            1
+            for key, val in output.items()
+            if isinstance(val, torch.Tensor)
+            and torch.isnan(val.detach().cpu()).sum() > 0
         )
         > 0
     )
@@ -497,10 +478,11 @@ def run_inference(
                 cfg.prediction.metric != "Perplexity"
                 and cfg.problem_type != "text_causal_classification_modeling"
             ):
-                output = {}
-                output["predicted_answer_ids"] = (
-                    model.module.generate(batch, cfg).detach().cpu()  # type: ignore
-                )
+                output = {
+                    "predicted_answer_ids": model.module.generate(batch, cfg)
+                    .detach()
+                    .cpu()
+                }
             else:
                 output = model.forward(batch)
         else:
@@ -509,10 +491,12 @@ def run_inference(
                     cfg.prediction.metric != "Perplexity"
                     and cfg.problem_type != "text_causal_classification_modeling"
                 ):
-                    output = {}
-                    output["predicted_answer_ids"] = (
-                        unwrap_model(model).generate(batch, cfg).detach().cpu()
-                    )
+                    output = {
+                        "predicted_answer_ids": unwrap_model(model)
+                        .generate(batch, cfg)
+                        .detach()
+                        .cpu()
+                    }
                 else:
                     output = model.forward(batch)
         if contains_nan(output) and cfg.environment.mixed_precision:
@@ -702,18 +686,17 @@ def create_nlp_backbone(cfg, model_class=AutoModel) -> Any:
         # cast all non INT8 parameters to fp32
         if loaded_in_kbit:
             for param in backbone.parameters():
-                if (param.dtype == torch.float16) or (param.dtype == torch.bfloat16):
+                if param.dtype in [torch.float16, torch.bfloat16]:
                     param.data = param.data.to(torch.float32)
-    else:
-        if cfg.architecture.backbone_dtype != "float32":
-            if cfg.environment.mixed_precision:
-                logger.info("Disabling mixed precision as dtype not set to float32.")
-                cfg.environment.mixed_precision = False
-            if cfg.architecture.backbone_dtype != "bfloat16":
-                logger.warning(
-                    "Pure float16 or int8 training will "
-                    "likely lead to unstable training without adapters."
-                )
+    elif cfg.architecture.backbone_dtype != "float32":
+        if cfg.environment.mixed_precision:
+            logger.info("Disabling mixed precision as dtype not set to float32.")
+            cfg.environment.mixed_precision = False
+        if cfg.architecture.backbone_dtype != "bfloat16":
+            logger.warning(
+                "Pure float16 or int8 training will "
+                "likely lead to unstable training without adapters."
+            )
 
     if cfg.architecture.gradient_checkpointing:
         backbone.gradient_checkpointing_enable()

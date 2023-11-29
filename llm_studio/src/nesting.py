@@ -37,10 +37,9 @@ class Dependency:
             return False
         elif self.is_set and self.value not in dependency_values:
             return False
-        elif (
-            not self.is_set
-            and len([v for v in dependency_values if v != self.value]) == 0
-        ):
+        elif not self.is_set and not [
+            v for v in dependency_values if v != self.value
+        ]:
             return False
         return True
 

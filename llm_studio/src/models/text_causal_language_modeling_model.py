@@ -56,7 +56,6 @@ class Model(nn.Module):
             self.backbone.config.use_cache = False
 
         outputs: Dict = {}
-        mask_key = "attention_mask"
         pad_keys = [
             "input_ids",
             "attention_mask",
@@ -65,6 +64,7 @@ class Model(nn.Module):
         ]
 
         if padding:
+            mask_key = "attention_mask"
             batch = batch_padding(
                 self.cfg,
                 batch,

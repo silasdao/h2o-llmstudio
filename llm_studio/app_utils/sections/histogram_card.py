@@ -18,7 +18,7 @@ def histogram_card(
     )
     df_quantile = compute_quantile_df(x, a, b)
     df_quantile = df_quantile.rename(columns={"length": x_axis_description})
-    card = ui.plot_card(
+    return ui.plot_card(
         box=histogram_box,
         title=title,
         data=data(
@@ -40,7 +40,6 @@ def histogram_card(
             ]
         ),
     )
-    return card
 
 
 def compute_quantile_df(x: List[int], a: float, b: float):

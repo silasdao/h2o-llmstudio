@@ -61,17 +61,17 @@ class ConversationChainHandler:
         else:
             self.answers = ["" for _ in range(len(self.prompts))]
 
-        if cfg.dataset.system_column != "None":
-            if cfg.dataset.system_column not in df.columns:
-                logger.warning(
-                    f"System column {cfg.dataset.system_column} not found."
-                    f"Disabling functionality."
-                )
-                self.systems = ["" for _ in range(len(self.prompts))]
-            else:
-                self.systems = df[cfg.dataset.system_column].astype(str).tolist()
-        else:
+        if cfg.dataset.system_column == "None":
             self.systems = ["" for _ in range(len(self.prompts))]
+
+        elif cfg.dataset.system_column not in df.columns:
+            logger.warning(
+                f"System column {cfg.dataset.system_column} not found."
+                f"Disabling functionality."
+            )
+            self.systems = ["" for _ in range(len(self.prompts))]
+        else:
+            self.systems = df[cfg.dataset.system_column].astype(str).tolist()
 
     def get_conversation_chain_ids(self, cfg, df):
         """
@@ -206,8 +206,4 @@ def get_conversation_chains(
     cfg.dataset.limit_chained_samples = limit_chained_samples
     conversation_chain_handler = ConversationChainHandler(df, cfg)
     cfg.dataset.limit_chained_samples = orig_limit_chained_samples
-    conversations = [
-        conversation
-        for conversation in conversation_chain_handler  # type: ignore[attr-defined]
-    ]
-    return conversations
+    return list(conversation_chain_handler)

@@ -32,9 +32,11 @@ def get_model_card(cfg, model, repo_id) -> huggingface_hub.ModelCard:
         library_name="transformers",
         tags=["gpt", "llm", "large language model", "h2o-llmstudio"],
     )
-    card = huggingface_hub.ModelCard.from_template(
+    return huggingface_hub.ModelCard.from_template(
         card_data,
-        template_path=os.path.join("model_cards", cfg.environment._model_card_template),
+        template_path=os.path.join(
+            "model_cards", cfg.environment._model_card_template
+        ),
         base_model=cfg.llm_backbone,  # will be replaced in template if it exists
         repo_id=repo_id,
         model_architecture=model.backbone.__repr__(),
@@ -57,7 +59,6 @@ def get_model_card(cfg, model, repo_id) -> huggingface_hub.ModelCard:
         if cfg.dataset.add_eos_token_to_prompt
         else "",
     )
-    return card
 
 
 def publish_model_to_hugging_face(
@@ -85,11 +86,9 @@ def publish_model_to_hugging_face(
     """
 
     # Check if the 'device' value is valid, raise an exception if not
-    if device == "cpu" or device == "cpu_shard":
+    if device in {"cpu", "cpu_shard"}:
         pass  # 'cpu' is a valid value
-    elif device.startswith("cuda:") and device[5:].isdigit():
-        pass  # 'cuda:integer' format is valid
-    else:
+    elif not device.startswith("cuda:") or not device[5:].isdigit():
         raise ValueError(
             "Invalid device value. Use 'cpu', 'cpu_shard' or 'cuda:INTEGER'."
         )
@@ -108,7 +107,7 @@ def publish_model_to_hugging_face(
         huggingface_hub.login(api_key)
 
     # If 'user_id' argument is blank, fetch 'user_id' from the logged-in user
-    if user_id == "":
+    if not user_id:
         user_id = huggingface_hub.whoami()["name"]
 
     repo_id = f"{user_id}/{hf_repo_friendly_name(model_name)}"
@@ -175,12 +174,10 @@ def publish_model_to_hugging_face(
     data = {
         "text_prompt_start": cfg.dataset.text_prompt_start,
         "text_answer_separator": cfg.dataset.text_answer_separator,
+        "end_of_sentence": cfg._tokenizer_eos_token
+        if cfg.dataset.add_eos_token_to_prompt
+        else "",
     }
-
-    if cfg.dataset.add_eos_token_to_prompt:
-        data.update({"end_of_sentence": cfg._tokenizer_eos_token})
-    else:
-        data.update({"end_of_sentence": ""})
 
     custom_pipeline = pipeline_template.render(data)
 

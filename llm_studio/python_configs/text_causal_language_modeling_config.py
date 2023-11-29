@@ -56,13 +56,7 @@ class ConfigNLPCausalLMDataset(DefaultConfig):
     _allowed_file_extensions: Tuple[str, ...] = ("csv", "pq", "parquet")
 
     def __post_init__(self):
-        self.prompt_column = (
-            tuple(
-                self.prompt_column,
-            )
-            if isinstance(self.prompt_column, str)
-            else tuple(self.prompt_column)
-        )
+        self.prompt_column = tuple(self.prompt_column)
         super().__post_init__()
 
         self._possible_values["train_dataframe"] = possible_values.Files(
@@ -375,7 +369,7 @@ class ConfigNLPCausalLMEnvironment(DefaultConfig):
         super().__post_init__()
         self._possible_values["gpus"] = possible_values.String(
             values=tuple(
-                [(str(x), f"GPU #{x+1}") for x in range(torch.cuda.device_count())]
+                (str(x), f"GPU #{x + 1}") for x in range(torch.cuda.device_count())
             ),
             allow_custom=False,
         )

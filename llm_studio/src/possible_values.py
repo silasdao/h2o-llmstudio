@@ -20,7 +20,7 @@ def _scan_dirs(dirname) -> List[str]:
     subfolders = [f.path for f in os.scandir(dirname) if f.is_dir()]
     for dirname in list(subfolders):
         subfolders.extend(_scan_dirs(dirname))
-    subfolders = [x + "/" if x[-1] != "/" else x for x in subfolders]
+    subfolders = [f"{x}/" if x[-1] != "/" else x for x in subfolders]
     return subfolders
 
 
@@ -37,14 +37,13 @@ def _scan_files(
         List of files
 
     """
-    path_list = [
+    return [
         os.path.join(dirpath, filename)
         for dirpath, _, filenames in os.walk(dirname)
         for filename in filenames
         if any(map(filename.__contains__, extensions))
         and not filename.startswith("__meta_info__")
     ]
-    return path_list
 
 
 def strip_prefix(paths: Sequence[str], ignore_set: Set[str] = set()) -> Tuple[str, ...]:
@@ -65,18 +64,14 @@ def strip_prefix(paths: Sequence[str], ignore_set: Set[str] = set()) -> Tuple[st
         if path not in ignore_set
     ]
 
-    if len(paths_to_check) == 0:
+    if not paths_to_check:
         return tuple(paths)
 
     prefix = os.path.commonpath(paths_to_check)
-    stripped = tuple(
-        [
-            path if path in ignore_set else os.path.relpath(path, prefix)
-            for path in paths
-        ]
+    return tuple(
+        path if path in ignore_set else os.path.relpath(path, prefix)
+        for path in paths
     )
-
-    return stripped
 
 
 class Value:
@@ -126,7 +121,7 @@ class DatasetValue:
         Returns:
             A list
         """
-        if len(possible_values) == 0:
+        if not possible_values:
             return [""]
 
         # allow only values which are in the possible values
@@ -134,15 +129,15 @@ class DatasetValue:
             filter(lambda value: value in possible_values, current_values)
         )
 
-        if len(current_values) == 0:
+        if not current_values:
             # if the values are empty, take all the values where `prefer_with` is true
             for c in possible_values:
                 if prefer_with is not None and prefer_with(c):
                     current_values.append(c)
 
             # if they are still empty, just take the first possible value
-            if len(current_values) == 0:
-                current_values = [possible_values[0]]
+        if not current_values:
+            current_values = [possible_values[0]]
 
         return current_values
 
@@ -275,18 +270,17 @@ class ColumnValue(DatasetValue):
         except KeyError:
             df = None
 
-        if df is not None:
-            if self.dependency is not None and not self.dependency.check(
-                [dataset[self.dependency.key]]
-            ):
-                values = self.default
-            elif self.column in df:
-                values = [str(v) for v in sorted(list(df[self.column].unique()))]
-            else:
-                values = self.default
-        else:
+        if df is None:
             values = self.default
 
+        elif self.dependency is not None and not self.dependency.check(
+                [dataset[self.dependency.key]]
+            ):
+            values = self.default
+        elif self.column in df:
+            values = [str(v) for v in sorted(list(df[self.column].unique()))]
+        else:
+            values = self.default
         value = DatasetValue._compute_current_values(value, values, self.prefer_with)
 
         return (
