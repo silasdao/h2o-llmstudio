@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 class IgnorePatchRequestsFilter(logging.Filter):
     def filter(self, record):
         log_message = record.getMessage()
-        if re.search(r"HTTP Request: PATCH", log_message):
-            return False  # Ignore the log entry
-        return True  # Include the log entry
+        return not re.search(r"HTTP Request: PATCH", log_message)
 
 
 def initialize_logging(cfg: Optional[Any] = None, actual_logger=None):

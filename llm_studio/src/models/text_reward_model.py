@@ -147,13 +147,10 @@ class RewardModel(nn.Module):
                 input_text = ""
 
                 for i, prompt_part in enumerate(prompt[::-1]):
-                    if i % 2 == 0:
-                        prefix = "<|prompter|>"
-                    else:
-                        prefix = "<|assistant|>"
-                    input_text = f"{prefix}{prompt_part}<|endoftext|>" + input_text
+                    prefix = "<|prompter|>" if i % 2 == 0 else "<|assistant|>"
+                    input_text = f"{prefix}{prompt_part}<|endoftext|>{input_text}"
 
-                input_text = input_text + f"<|assistant|>{answer}<|endoftext|>"
+                input_text = f"{input_text}<|assistant|>{answer}<|endoftext|>"
 
                 inputs = self.tokenizer(
                     input_text, return_tensors="pt", max_length=2048

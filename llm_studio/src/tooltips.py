@@ -34,8 +34,7 @@ def cleanhtml(raw_html: str) -> str:
         str: the cleaned string
     """
 
-    cleantext = re.sub(CLEANR, "", raw_html)
-    return cleantext
+    return re.sub(CLEANR, "", raw_html)
 
 
 def clean_docusaurus_tags(text: str) -> str:
@@ -52,8 +51,7 @@ def clean_docusaurus_tags(text: str) -> str:
     text = text.replace(":::info note", "")
     text = text.replace(":::info Note", "")
     text = text.replace(":::tip tip", "")
-    text = text.replace(":::", "")
-    return text
+    return text.replace(":::", "")
 
 
 def clean_md_links(text: str) -> str:
@@ -67,8 +65,7 @@ def clean_md_links(text: str) -> str:
         str: the cleaned string
     """
 
-    text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
-    return text
+    return re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
 
 
 @dataclass
@@ -131,10 +128,7 @@ class Tooltips:
         return f"{self.tooltips}"
 
     def get(self, name: str, default=None):
-        if name in self.tooltips.keys():
-            return self.tooltips[name].text
-        else:
-            return default
+        return self.tooltips[name].text if name in self.tooltips.keys() else default
 
 
 tooltips = Tooltips()

@@ -35,9 +35,10 @@ class SampleAveragedCrossEntropyLoss(nn.Module):
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
 
-        loss = 0
-        for i in range(labels.shape[0]):
-            loss += self.loss_fn(shift_logits[i], shift_labels[i])
+        loss = sum(
+            self.loss_fn(shift_logits[i], shift_labels[i])
+            for i in range(labels.shape[0])
+        )
         loss /= labels.shape[0]
         return loss
 

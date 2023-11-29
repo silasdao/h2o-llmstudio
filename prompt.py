@@ -147,5 +147,5 @@ if __name__ == "__main__":
             print(output)
             print()
         except Exception as e:
-            print("Error: {}".format(e))
+            print(f"Error: {e}")
             print("Something went wrong, please try again.")

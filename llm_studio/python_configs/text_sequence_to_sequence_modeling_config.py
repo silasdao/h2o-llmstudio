@@ -31,13 +31,7 @@ class ConfigNLPSeq2SeqDataset(ConfigNLPCausalLMDataset):
     mask_prompt_labels: bool = True
 
     def __post_init__(self):
-        self.prompt_column = (
-            tuple(
-                self.prompt_column,
-            )
-            if isinstance(self.prompt_column, str)
-            else tuple(self.prompt_column)
-        )
+        self.prompt_column = tuple(self.prompt_column)
         super().__post_init__()
 
         self._visibility["limit_chained_samples"] = -1

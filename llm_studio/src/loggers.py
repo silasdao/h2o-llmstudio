@@ -34,7 +34,7 @@ def get_cfg(cfg: Any) -> Dict:
         if k.startswith("_") or cfg._get_visibility(k) < 0:
             continue
 
-        if any([x in k for x in ["api"]]):
+        if any(x in k for x in ["api"]):
             continue
 
         if dataclasses.is_dataclass(v):
@@ -43,11 +43,7 @@ def get_cfg(cfg: Any) -> Dict:
             items = {**items, **t}
         else:
             type_annotation = type_annotations[k]
-            if type_annotation == float:
-                items[k] = float(v)
-            else:
-                items[k] = v
-
+            items[k] = float(v) if type_annotation == float else v
     return items
 
 
@@ -56,11 +52,7 @@ class NeptuneLogger:
         import neptune as neptune
         from neptune.utils import stringify_unsupported
 
-        if cfg.logging._neptune_debug:
-            mode = "debug"
-        else:
-            mode = "async"
-
+        mode = "debug" if cfg.logging._neptune_debug else "async"
         self.logger = neptune.init_run(
             project=cfg.logging.neptune_project,
             api_token=os.getenv("NEPTUNE_API_TOKEN", ""),
@@ -93,25 +85,16 @@ class LocalLogger:
     def log(self, subset: str, name: str, value: Any, step: Optional[int] = None):
         if subset in PLOT_ENCODINGS:
             with SqliteDict(self.logs) as logs:
-                if subset not in logs:
-                    subset_dict = dict()
-                else:
-                    subset_dict = logs[subset]
+                subset_dict = dict() if subset not in logs else logs[subset]
                 subset_dict[name] = value
                 logs[subset] = subset_dict
                 logs.commit()
             return
 
         # https://github.com/h2oai/wave/issues/447
-        if np.isnan(value):
-            value = None
-        else:
-            value = float(value)
+        value = None if np.isnan(value) else float(value)
         with SqliteDict(self.logs) as logs:
-            if subset not in logs:
-                subset_dict = dict()
-            else:
-                subset_dict = logs[subset]
+            subset_dict = dict() if subset not in logs else logs[subset]
             if name not in subset_dict:
                 subset_dict[name] = {"steps": [], "values": []}
 

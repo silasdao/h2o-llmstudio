@@ -34,7 +34,7 @@ def check_config_for_errors(cfg: DefaultConfigProblemBase) -> dict:
 
 def check_for_common_errors(cfg: DefaultConfigProblemBase) -> dict:
     errors: Dict[str, List] = {"title": [], "message": []}
-    if not len(cfg.environment.gpus) > 0:
+    if len(cfg.environment.gpus) <= 0:
         errors["title"] += ["No GPU selected"]
         errors["message"] += [
             "Please select at least one GPU to start the experiment! "

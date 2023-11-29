@@ -120,17 +120,6 @@ def start_process(
             "-Y",
             config_name,
         ]
-    # Do not delete for debug purposes
-    # elif num_gpus == 1:
-    #     cmd = [
-    #         "env",
-    #         f"CUDA_VISIBLE_DEVICES={','.join(gpu_list)}",
-    #         "python",
-    #         "-u",
-    #         "train_wave.py",
-    #         "-P",
-    #         config_name,
-    #     ]
     else:
         free_port = find_free_port()
         if cfg.environment.use_deepspeed:
@@ -152,7 +141,7 @@ def start_process(
                 "env",
                 f"CUDA_VISIBLE_DEVICES={','.join(gpu_list)}",
                 "torchrun",
-                f"--nproc_per_node={str(num_gpus)}",
+                f"--nproc_per_node={num_gpus}",
                 f"--master_port={str(free_port)}",
                 "train_wave.py",
                 "-Y",
@@ -183,10 +172,8 @@ def clean_macos_artifacts(path: str) -> None:
     shutil.rmtree(os.path.join(path, "__MACOSX/"), ignore_errors=True)
 
     for ds_store in glob.glob(os.path.join(path, "**/.DS_Store"), recursive=True):
-        try:
+        with contextlib.suppress(OSError):
             os.remove(ds_store)
-        except OSError:
-            pass
 
 
 def s3_session(aws_access_key: str, aws_secret_key: str) -> Any:
@@ -206,20 +193,20 @@ def s3_session(aws_access_key: str, aws_secret_key: str) -> Any:
     )
     s3 = session.resource("s3")
     # if no key is present, disable signing
-    if aws_access_key == "" and aws_secret_key == "":
+    if not aws_access_key and not aws_secret_key:
         s3.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
 
     return s3
 
 
 def filter_valid_files(files) -> List[str]:
-    valid_files = [
+    return [
         file
         for file in files
-        if any([file.endswith(ext) for ext in default_cfg.allowed_file_extensions])
+        if any(
+            file.endswith(ext) for ext in default_cfg.allowed_file_extensions
+        )
     ]
-
-    return valid_files
 
 
 def s3_file_options(
@@ -249,16 +236,12 @@ def s3_file_options(
 
         folder = "/".join(bucket_split[1:])
 
-        files = []
-        for s3_file in s3_bucket.objects.filter(Prefix=f"{folder}/"):
-            if s3_file.key == f"{folder}/":
-                continue
-
-            files.append(s3_file.key)
-
-        files = filter_valid_files(files)
-        return files
-
+        files = [
+            s3_file.key
+            for s3_file in s3_bucket.objects.filter(Prefix=f"{folder}/")
+            if s3_file.key != f"{folder}/"
+        ]
+        return filter_valid_files(files)
     except Exception as e:
         logger.warning(f"Can't load S3 datasets list: {e}")
         return None
@@ -337,7 +320,7 @@ class S3Progress:
     async def poll(self):
         """Update wave ui"""
 
-        while self._percentage / 100 < 1:
+        while self._percentage < 100:
             await self.update_ui()
             await self._q.sleep(0.1)
         await self.update_ui()
@@ -493,7 +476,7 @@ async def azure_download(
     folder = "/".join(filename_split[:-1])
     filename = filename_split[-1]
 
-    rnd_folder = "".join(random.choice(string.digits) for i in range(10))
+    rnd_folder = "".join(random.choice(string.digits) for _ in range(10))
     azure_path = f"{get_data_dir(q)}/tmp_{rnd_folder}"
     azure_path = get_valid_temp_data_folder(q, azure_path)
 
@@ -584,14 +567,11 @@ async def kaggle_download(
     command_run += command.split(" ") + ["-p", kaggle_path]
     subprocess.run(command_run)
 
-    try:
+    with contextlib.suppress(Exception):
         zip_file = f"{kaggle_path}/{command.split(' ')[-1].split('/')[-1]}.zip"
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
             zip_ref.extractall(kaggle_path)
         os.remove(zip_file)
-    except Exception:
-        pass
-
     clean_macos_artifacts(kaggle_path)
 
     for f in glob.glob(kaggle_path + "/*"):
@@ -1074,7 +1054,7 @@ def check_dependencies(cfg: Any, pre: str, k: str, q: Q, dataset_import: bool = 
     else:
         dependencies = [x for x in dependencies if x.key not in ["data_format"]]
 
-    if len(dependencies) > 0:
+    if dependencies:
         all_deps = 0
         for d in dependencies:
             if isinstance(q.client[f"{pre}/cfg/{d.key}"], (list, tuple)):
@@ -1099,12 +1079,7 @@ def is_visible(k: str, cfg: Any, q: Q) -> bool:
         List of ui elements
     """
 
-    visibility = 1
-
-    if visibility < cfg._get_visibility(k):
-        return False
-
-    return True
+    return cfg._get_visibility(k) <= 1
 
 
 def get_ui_elements(
@@ -1133,11 +1108,7 @@ def get_ui_elements(
     cfg_dict = {key: cfg_dict[key] for key in cfg._get_order()}
 
     for k, v in cfg_dict.items():
-        if "api" in k:
-            password = True
-        else:
-            password = False
-
+        password = "api" in k
         if k.startswith("_") or cfg._get_visibility(k) < 0:
             if q.client[f"{pre}/cfg_mode/from_cfg"]:
                 q.client[f"{pre}/cfg/{k}"] = v
@@ -1328,9 +1299,10 @@ def get_experiment_status(path: str) -> Tuple[str, str]:
                     if status == "failed":
                         single_gpu_failures.append(info)
         # Get the most detailed failure info
-        if len(single_gpu_failures) > 0:
-            detailed_gpu_failures = [x for x in single_gpu_failures if x != "See logs"]
-            if len(detailed_gpu_failures) > 0:
+        if single_gpu_failures:
+            if detailed_gpu_failures := [
+                x for x in single_gpu_failures if x != "See logs"
+            ]:
                 return "failed", detailed_gpu_failures[0]
             else:
                 return "failed", single_gpu_failures[0]
@@ -1363,46 +1335,35 @@ def get_experiments_status(df: DataFrame) -> Tuple[List[str], List[str]]:
         pid = row.process_id
 
         zombie = False
-        try:
+        with contextlib.suppress(psutil.NoSuchProcess):
             p = psutil.Process(pid)
             zombie = p.status() == "zombie"
-        except psutil.NoSuchProcess:
-            pass
-        if not psutil.pid_exists(pid) or zombie:
-            running = False
-        else:
-            running = True
-
+        running = bool(psutil.pid_exists(pid) and not zombie)
         if running:
-            if status == "none":
+            if status == "failed":
+                status_all.append("failed")
+            elif status in ["none", "queued"]:
                 status_all.append("queued")
             elif status == "running":
                 status_all.append("running")
-            elif status == "queued":
-                status_all.append("queued")
-            elif status == "finished":
-                status_all.append("finished")
             elif status == "stopped":
                 status_all.append("stopped")
-            elif status == "failed":
-                status_all.append("failed")
             else:
                 status_all.append("finished")
+        elif status == "none":
+            status_all.append("failed")
+        elif status == "queued":
+            status_all.append("failed")
+        elif status == "running":
+            status_all.append("failed")
+        elif status == "finished":
+            status_all.append("finished")
+        elif status == "stopped":
+            status_all.append("stopped")
+        elif status == "failed":
+            status_all.append("failed")
         else:
-            if status == "none":
-                status_all.append("failed")
-            elif status == "queued":
-                status_all.append("failed")
-            elif status == "running":
-                status_all.append("failed")
-            elif status == "finished":
-                status_all.append("finished")
-            elif status == "stopped":
-                status_all.append("stopped")
-            elif status == "failed":
-                status_all.append("failed")
-            else:
-                status_all.append("failed")
+            status_all.append("failed")
 
     return status_all, info_all
 
@@ -1487,16 +1448,12 @@ def get_experiments_info(df: DataFrame, q: Q) -> DefaultDict:
                     eta = elapsed * (remaining_steps / curr_total_step)
                     if eta == 0:
                         eta = ""
+                    elif eta > 86400:
+                        eta = time.strftime(
+                            "%-jd %H:%M:%S", time.gmtime(float(eta - 86400))
+                        )
                     else:
-                        # if more than one day, show days
-                        # need to subtract 1 day from time_took since strftime shows
-                        # day of year which starts counting at 1
-                        if eta > 86400:
-                            eta = time.strftime(
-                                "%-jd %H:%M:%S", time.gmtime(float(eta - 86400))
-                            )
-                        else:
-                            eta = time.strftime("%H:%M:%S", time.gmtime(float(eta)))
+                        eta = time.strftime("%H:%M:%S", time.gmtime(float(eta)))
                 else:
                     eta = "N/A"
             else:
@@ -1705,10 +1662,11 @@ def start_experiment(cfg: Any, q: Q, pre: str, gpu_list: Optional[List] = None) 
     ]
     all_process_queue = []
     for _, row in running_experiments.iterrows():
-        for gpu_id in row["gpu_list"].split(","):
-            if gpu_id in gpu_list:
-                all_process_queue.append(row["process_id"])
-
+        all_process_queue.extend(
+            row["process_id"]
+            for gpu_id in row["gpu_list"].split(",")
+            if gpu_id in gpu_list
+        )
     process_queue = list(set(all_process_queue))
 
     env_vars = {
@@ -1728,9 +1686,7 @@ def start_experiment(cfg: Any, q: Q, pre: str, gpu_list: Optional[List] = None) 
             }
         )
     if q.client["default_huggingface_api_token"]:
-        env_vars.update(
-            {"HUGGINGFACE_TOKEN": q.client["default_huggingface_api_token"]}
-        )
+        env_vars["HUGGINGFACE_TOKEN"] = q.client["default_huggingface_api_token"]
 
     env_vars = {k: v or "" for k, v in env_vars.items()}
 
@@ -1778,7 +1734,7 @@ def get_frame_stats(frame):
 
     numeric_cols = [col for col in frame if col not in non_numeric_cols]
 
-    if len(non_numeric_cols) == 0 or len(numeric_cols) == 0:
+    if len(non_numeric_cols) == 0 or not numeric_cols:
         stats = frame.describe()
         if len(numeric_cols):
             stats = stats.round(decimals=3)
@@ -1936,7 +1892,7 @@ def remove_temp_files(q: Q):
     datasets_df = q.client.app_db.get_datasets_df()
     all_files = glob.glob(os.path.join(get_data_dir(q), "*"))
     for file in all_files:
-        if not any([path in file for path in datasets_df["path"].values]):
+        if all(path not in file for path in datasets_df["path"].values):
             if os.path.isdir(file):
                 shutil.rmtree(file)
             else:
@@ -1989,7 +1945,7 @@ def copy_config(cfg: Any, q: Q) -> Any:
     """
     # make unique yaml file using uuid
     os.makedirs(get_output_dir(q), exist_ok=True)
-    tmp_file = os.path.join(f"{get_output_dir(q)}/", str(uuid.uuid4()) + ".yaml")
+    tmp_file = os.path.join(f"{get_output_dir(q)}/", f"{str(uuid.uuid4())}.yaml")
     save_config_yaml(tmp_file, cfg)
     cfg = load_config_yaml(tmp_file)
     os.remove(tmp_file)
@@ -2016,8 +1972,10 @@ def get_cfg_list_items(cfg) -> List:
     items = parse_cfg_dataclass(cfg)
     x = []
     for item in items:
-        for k, v in item.items():
-            x.append(ui.stat_list_item(label=make_label(k), value=str(v)))
+        x.extend(
+            ui.stat_list_item(label=make_label(k), value=str(v))
+            for k, v in item.items()
+        )
     return x
 
 

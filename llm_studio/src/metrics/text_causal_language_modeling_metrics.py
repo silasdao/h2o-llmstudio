@@ -123,9 +123,7 @@ def gpt_score(
     scores = [x[0] for x in ret]
     explanations = [x[1] for x in ret]
 
-    if raw_results:
-        return np.array(scores), explanations
-    return np.mean(scores)
+    return (np.array(scores), explanations) if raw_results else np.mean(scores)
 
 
 class Perplexity(nn.Module):
@@ -139,9 +137,10 @@ class Perplexity(nn.Module):
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
 
-        perplexity = []
-        for i in range(labels.shape[0]):
-            perplexity.append(self.loss_fn(shift_logits[i], shift_labels[i]))
+        perplexity = [
+            self.loss_fn(shift_logits[i], shift_labels[i])
+            for i in range(labels.shape[0])
+        ]
         perplexity = torch.stack(perplexity, dim=0)
         perplexity = torch.exp(perplexity)
         if self.reduce:

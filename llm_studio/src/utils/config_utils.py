@@ -37,8 +37,7 @@ def _load_cls(module_path: str, cls_name: str) -> Any:
     """
 
     module_path_fixed = module_path
-    if module_path_fixed.endswith(".py"):
-        module_path_fixed = module_path_fixed[:-3]
+    module_path_fixed = module_path_fixed.removesuffix(".py")
     module_path_fixed = module_path_fixed.replace("/", ".")
 
     module = importlib.import_module(module_path_fixed)
@@ -46,13 +45,11 @@ def _load_cls(module_path: str, cls_name: str) -> Any:
     rreload(module)
     module = importlib.reload(module)
 
-    assert hasattr(module, cls_name), "{} file should contain {} class".format(
-        module_path, cls_name
-    )
+    assert hasattr(
+        module, cls_name
+    ), f"{module_path} file should contain {cls_name} class"
 
-    cls = getattr(module, cls_name)
-
-    return cls
+    return getattr(module, cls_name)
 
 
 def load_config_py(config_path: str, config_name: str = "Config"):
@@ -97,7 +94,7 @@ def convert_cfg_base_to_nested_dictionary(cfg: DefaultConfigProblemBase) -> dict
         if k.startswith("_"):
             continue
 
-        if any([x in k for x in ["api", "secret"]]):
+        if any(x in k for x in ["api", "secret"]):
             raise AssertionError(
                 "Config item must not contain the word 'api' or 'secret'"
             )
@@ -105,7 +102,7 @@ def convert_cfg_base_to_nested_dictionary(cfg: DefaultConfigProblemBase) -> dict
         type_annotation = type_annotations[k]
 
         if type_annotation in KNOWN_TYPE_ANNOTATIONS:
-            grouped_cfg_dict.update({k: v})
+            grouped_cfg_dict[k] = v
         elif dataclasses.is_dataclass(v):
             group_items = parse_cfg_dataclass(cfg=v)
             group_items = {
@@ -113,10 +110,9 @@ def convert_cfg_base_to_nested_dictionary(cfg: DefaultConfigProblemBase) -> dict
                 for d in group_items
                 for k, v in d.items()
             }
-            grouped_cfg_dict.update({k: group_items})
+            grouped_cfg_dict[k] = group_items
         else:
-            raise _get_type_annotation_error(v, type_annotations[k])
-
+            raise _get_type_annotation_error(v, type_annotation)
     # not an explicit field in the config
     grouped_cfg_dict["problem_type"] = cfg.problem_type
     return grouped_cfg_dict
@@ -155,8 +151,7 @@ def parse_cfg_dataclass(cfg) -> List[Dict]:
 
     items = []
 
-    parent_element = get_parent_element(cfg)
-    if parent_element:
+    if parent_element := get_parent_element(cfg):
         items.append(parent_element)
 
     cfg_dict = cfg.__dict__
@@ -167,7 +162,7 @@ def parse_cfg_dataclass(cfg) -> List[Dict]:
         if k.startswith("_"):
             continue
 
-        if any([x in k for x in ["api"]]):
+        if any(x in k for x in ["api"]):
             continue
 
         type_annotation = type_annotations[k]

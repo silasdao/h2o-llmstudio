@@ -75,13 +75,13 @@ def test_get_data_automatic_split(
     train_ids = set(train_df["id"].tolist())
     val_ids = set(val_df["id"].tolist())
 
-    assert len(train_ids.intersection(val_ids)) == 0
+    assert not train_ids.intersection(val_ids)
     assert len(train_ids) + len(val_ids) == 100
 
     shared_groups = [
         i for i in groups if not train_ids.isdisjoint(i) and not val_ids.isdisjoint(i)
     ]
-    assert len(shared_groups) == 0
+    assert not shared_groups
 
 
 def test_oasst_data_automatic_split(tmp_path: pathlib.Path):

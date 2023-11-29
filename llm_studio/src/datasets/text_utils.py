@@ -59,10 +59,10 @@ def get_tokenizer(cfg: Any):
         tokenizer.eos_token = "</s>"
 
     if tokenizer.pad_token is None:
-        if tokenizer.unk_token is not None:
-            tokenizer.pad_token = tokenizer.unk_token
-        else:
+        if tokenizer.unk_token is None:
             tokenizer.pad_token = tokenizer.eos_token
+        else:
+            tokenizer.pad_token = tokenizer.unk_token
     if tokenizer.bos_token is None:
         tokenizer.bos_token = tokenizer.eos_token
     if tokenizer.cls_token is None:
@@ -109,12 +109,12 @@ def get_tokenizer(cfg: Any):
     cfg.tokenizer._vocab_length = len(tokenizer)
 
     cfg.tokenizer._stop_words_ids = []
-    for stop_word in set(cfg.tokenizer._stop_words):
-        cfg.tokenizer._stop_words_ids.append(
-            tokenizer(stop_word, return_tensors="pt", add_special_tokens=False)[
-                "input_ids"
-            ][0]
-        )
+    cfg.tokenizer._stop_words_ids.extend(
+        tokenizer(stop_word, return_tensors="pt", add_special_tokens=False)[
+            "input_ids"
+        ][0]
+        for stop_word in set(cfg.tokenizer._stop_words)
+    )
     if cfg.environment._local_rank == 0:
         logger.info(f"Stop token ids: {cfg.tokenizer._stop_words_ids}")
 

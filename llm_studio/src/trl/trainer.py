@@ -74,8 +74,7 @@ def logprobs_from_logits(logits, labels, gather=True):
 
     if not gather:
         return logp
-    logpy = torch.gather(logp, 2, labels.unsqueeze(2)).squeeze(-1)
-    return logpy
+    return torch.gather(logp, 2, labels.unsqueeze(2)).squeeze(-1)
 
 
 def masked_mean(values, mask, axis=None):
@@ -119,15 +118,13 @@ def clip_by_value(x, tensor_min, tensor_max):
     Tensor extenstion to torch.clamp
     https://github.com/pytorch/pytorch/issues/2793#issuecomment-428784713
     """
-    clipped = torch.max(torch.min(x, tensor_max), tensor_min)
-    return clipped
+    return torch.max(torch.min(x, tensor_max), tensor_min)
 
 
 def entropy_from_logits(logits: torch.Tensor):
     """Calculate entropy from logits."""
     pd = torch.nn.functional.softmax(logits, dim=-1)
-    entropy = torch.logsumexp(logits, dim=-1) - torch.sum(pd * logits, dim=-1)
-    return entropy
+    return torch.logsumexp(logits, dim=-1) - torch.sum(pd * logits, dim=-1)
 
 
 def stats_to_np(stats_dict):

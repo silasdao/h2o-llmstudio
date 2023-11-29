@@ -184,9 +184,7 @@ def sample_data(cfg: Any, df: pd.DataFrame) -> pd.DataFrame:
         # A recursive function to get the root id for each node
         def get_root(node):
             parent = parent_mapping.get(node)
-            if parent is None or pd.isna(parent):
-                return node
-            return get_root(parent)
+            return node if parent is None or pd.isna(parent) else get_root(parent)
 
         # Apply the function to assign each row the root id
         df["root_id"] = df["id"].apply(get_root)
@@ -345,8 +343,7 @@ def get_train_dataset(train_df: pd.DataFrame, cfg: Any, verbose=True):
     if cfg.environment._local_rank == 0 and verbose:
         logger.info("Loading train dataset...")
 
-    train_dataset = cfg.dataset.dataset_class(df=train_df, cfg=cfg, mode="train")
-    return train_dataset
+    return cfg.dataset.dataset_class(df=train_df, cfg=cfg, mode="train")
 
 
 def get_train_dataloader(train_ds: Any, cfg: Any, verbose=True):
@@ -418,9 +415,7 @@ def get_val_dataset(val_df: pd.DataFrame, cfg: Any, verbose: bool = True):
 
     if verbose and cfg.environment._local_rank == 0:
         logger.info("Loading validation dataset...")
-    val_dataset = cfg.dataset.dataset_class(df=val_df, cfg=cfg, mode="validation")
-
-    return val_dataset
+    return cfg.dataset.dataset_class(df=val_df, cfg=cfg, mode="validation")
 
 
 def get_val_dataloader(val_ds: Any, cfg: Any, verbose: bool = True):
@@ -479,15 +474,15 @@ def cat_batches(
 
     for key, value in data.items():
         if len(value[0].shape) == 0:
-            if isinstance(value[0], torch.Tensor):
-                data[key] = torch.stack(value)
-            else:
-                data[key] = np.stack(value)
+            data[key] = (
+                torch.stack(value)
+                if isinstance(value[0], torch.Tensor)
+                else np.stack(value)
+            )
+        elif isinstance(value[0], torch.Tensor):
+            data[key] = torch.cat(value, dim=0)
         else:
-            if isinstance(value[0], torch.Tensor):
-                data[key] = torch.cat(value, dim=0)
-            else:
-                data[key] = np.concatenate(value, axis=0)
+            data[key] = np.concatenate(value, axis=0)
 
     return data
 
@@ -617,8 +612,8 @@ def batch_padding(
     elif cfg.tokenizer.padding_quantile == 0:
         return batch
     elif training and cfg.tokenizer.padding_quantile < 1.0:
-        if padding_side == "left":
-            idx = int(
+        idx = (
+            int(
                 torch.floor(
                     torch.quantile(
                         torch.stack(
@@ -631,8 +626,8 @@ def batch_padding(
                     )
                 )
             )
-        else:
-            idx = int(
+            if padding_side == "left"
+            else int(
                 torch.ceil(
                     torch.quantile(
                         torch.stack(
@@ -645,11 +640,11 @@ def batch_padding(
                     )
                 )
             )
+        )
+    elif padding_side == "left":
+        idx = int(torch.where(batch[mask_key] == 1)[1].min())
     else:
-        if padding_side == "left":
-            idx = int(torch.where(batch[mask_key] == 1)[1].min())
-        else:
-            idx = int(torch.where(batch[mask_key] == 1)[1].max())
+        idx = int(torch.where(batch[mask_key] == 1)[1].max())
 
     if padding_side == "left":
         for key in pad_keys:
